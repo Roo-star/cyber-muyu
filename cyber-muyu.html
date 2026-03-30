@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>賽博木魚 · Cyber Muyu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ── 全域字體 ── */
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#000;overflow:hidden;cursor:none;user-select:none;
+  font-family:'Noto Sans SC','AlibabaPuHuiTi3','PingFang TC','Microsoft JhengHei',sans-serif;
+}
+canvas{display:block;position:absolute;top:0;left:0}
+#cursor{position:fixed;width:200px;height:200px;pointer-events:none;z-index:9999;transform:translate(-15%,-85%);transition:transform .06s}
+#cursor.hit{transform:translate(-15%,-85%) rotate(-25deg) scale(1.1)}
+
+/* 左側短語面板 — 左下角，放大1倍 */
+#phrase-panel{
+  position:fixed;left:16px;bottom:16px;
+  width:clamp(300px,26vw,420px);
+  z-index:100;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;
+  gap:8px;padding:20px 22px;
+  background:linear-gradient(135deg,rgba(0,0,0,.70) 0%,rgba(0,0,0,.20) 100%);
+  border-radius:24px;border:1px solid rgba(255,200,100,.08);
+}
+#phrase-label{
+  color:rgba(255,200,100,.45);font-size:13px;letter-spacing:.22em;text-transform:uppercase;
+  margin-bottom:6px;pointer-events:none;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  text-shadow:0 0 8px rgba(255,200,100,.3);
+}
+.pb{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,200,100,.18);
+  color:rgba(255,220,150,.75);padding:9px 18px;border-radius:22px;
+  font-size:14px;cursor:pointer;transition:all .2s;
+  text-align:left;line-height:1.4;white-space:normal;width:100%;
+  font-family:'Noto Sans SC','PingFang TC','Microsoft JhengHei',sans-serif;
+  text-shadow:0 0 6px rgba(255,200,80,.2);
+}
+.pb:hover{background:rgba(255,200,100,.10);border-color:rgba(255,200,100,.55);color:rgba(255,230,180,1);text-shadow:0 0 12px rgba(255,200,80,.5)}
+.pb.on{background:rgba(255,180,60,.18);border-color:rgba(255,180,60,.85);color:#ffd88a;
+  box-shadow:0 0 10px rgba(255,180,60,.3);text-shadow:0 0 14px rgba(255,180,60,.6)}
+
+/* 右側輸入面板 — 垂直居中，高度縮半 */
+#cp{
+  position:fixed;right:0;top:25vh;height:50vh;width:28vw;
+  z-index:100;display:flex;flex-direction:column;justify-content:center;
+  align-items:flex-start;gap:16px;padding:0 clamp(16px,3vw,48px);
+  background:linear-gradient(to left,rgba(0,0,0,.60) 0%,rgba(0,0,0,0) 100%);
+}
+#cl{
+  color:rgba(255,200,100,.65);font-size:18px;letter-spacing:.06em;line-height:1.4;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  text-shadow:0 0 18px rgba(255,180,60,.4),0 0 40px rgba(255,140,30,.2);
+}
+#ci{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,200,100,.28);
+  color:rgba(255,230,180,1);padding:16px 22px;border-radius:32px;
+  font-size:26px;width:100%;outline:none;cursor:pointer;transition:all .2s;
+  caret-color:#ffd88a;
+  font-family:'Noto Sans SC','JetBrains Mono','PingFang TC',sans-serif;
+  text-shadow:0 0 12px rgba(255,200,100,.3);
+}
+#ci::placeholder{color:rgba(255,200,100,.28);font-family:'JetBrains Mono','Courier New',monospace}
+#ci.on{border-color:rgba(255,180,60,.9);background:rgba(255,180,60,.08);box-shadow:0 0 18px rgba(255,180,60,.28);cursor:text}
+
+/* 頂部標題 */
+#merit{
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  height:14vh;display:flex;align-items:center;justify-content:center;
+  color:rgba(255,200,100,.85);font-size:clamp(28px,4.5vw,72px);font-weight:200;
+  letter-spacing:.4em;white-space:nowrap;
+  pointer-events:none;z-index:100;
+  font-family:'Noto Sans SC','PingFang TC','Microsoft JhengHei',sans-serif;
+  text-shadow:0 0 40px rgba(255,180,60,.6),0 0 90px rgba(255,140,30,.3),0 0 180px rgba(255,100,20,.15);
+}
+
+/* 右上角輪數 — 放大3倍 */
+#round-counter{position:fixed;top:28px;right:26px;z-index:100;pointer-events:none;text-align:right;opacity:0;transition:opacity 1s}
+#round-counter .rc-main{
+  color:rgba(180,220,255,.85);font-size:42px;letter-spacing:.06em;line-height:1.5;
+  font-family:'Noto Sans SC','PingFang TC','Microsoft JhengHei',sans-serif;
+  text-shadow:0 0 20px rgba(120,200,255,.6),0 0 50px rgba(80,160,255,.3);
+}
+#round-counter .rc-sub{
+  color:rgba(120,170,220,.55);font-size:14px;letter-spacing:.15em;line-height:1.4;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  text-shadow:0 0 12px rgba(100,180,255,.3);
+}
+
+/* 底部提示 */
+#tap-hint{
+  position:fixed;bottom:32px;left:50%;transform:translateX(-50%);
+  z-index:100;pointer-events:none;color:rgba(255,255,255,.38);
+  font-size:15px;letter-spacing:.28em;text-transform:uppercase;white-space:nowrap;
+  font-family:'JetBrains Mono','Courier New',monospace;
+  text-shadow:0 0 16px rgba(255,255,255,.18);
+}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas id="c"></canvas>
+<svg id="cursor" viewBox="0 0 160 320" fill="none">
+<defs>
+<linearGradient id="g1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#5a3010"/><stop offset="40%" stop-color="#c8853a"/><stop offset="60%" stop-color="#e8aa55"/><stop offset="100%" stop-color="#5a3010"/></linearGradient>
+<linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4813a"/><stop offset="50%" stop-color="#b05820"/><stop offset="100%" stop-color="#6a2e08"/></linearGradient>
+<radialGradient id="g3" cx="35%" cy="30%" r="55%"><stop offset="0%" stop-color="rgba(255,220,160,.5)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+</defs>
+<rect x="70" y="110" width="20" height="200" rx="10" fill="url(#g1)"/>
+<rect x="75" y="115" width="6" height="190" rx="3" fill="rgba(255,200,120,.18)"/>
+<ellipse cx="80" cy="115" rx="12" ry="8" fill="#7a3a10"/>
+<ellipse cx="80" cy="72" rx="52" ry="48" fill="url(#g2)"/>
+<ellipse cx="80" cy="72" rx="52" ry="48" fill="url(#g3)"/>
+<ellipse cx="72" cy="55" rx="22" ry="14" fill="rgba(255,220,160,.2)"/>
+</svg>
+<div id="merit">功德 · MERIT : <span id="mc">0</span></div>
+<div id="round-counter">
+  <div class="rc-main">今日您已敲了 <span id="rc-num">0</span> 輪</div>
+  <div class="rc-sub">The wooden fish remembers you.</div>
+</div>
+<div id="phrase-panel">
+  <div id="phrase-label">Choose one to chant</div>
+  <button class="pb" data-t="我錯了 I am really sorry +1" data-c="#ff6688">我錯了 I am really sorry +1</button>
+  <button class="pb" data-t="阿彌陀佛 Amitabha +1" data-c="#ffcc44">阿彌陀佛 Amitabha +1</button>
+  <button class="pb" data-t="功德 Merit +1" data-c="#44ffaa">功德 Merit +1</button>
+  <button class="pb" data-t="好運 Good Luck +1" data-c="#44aaff">好運 Good Luck +1</button>
+  <button class="pb" data-t="世界和平 World Peace +1" data-c="#cc88ff">世界和平 World Peace +1</button>
+  <button class="pb" data-t="請饒了我幹的壞事 Purge My Sins +1" data-c="#ff88cc">請饒了我幹的壞事 Purge My Sins +1</button>
+  <button class="pb" data-t="只有豬肉卷才是永恆的 Only pork rolls are eternal +1" data-c="#ffaa44">只有豬肉卷才是永恆的 Only pork rolls are eternal +1</button>
+</div>
+<div id="cp">
+  <div id="cl">Type your words to chant</div>
+  <input id="ci" type="text" placeholder="Enter text…" maxlength="24" readonly/>
+</div>
+<div id="tap-hint">Tap to beat &nbsp;|&nbsp; Scroll to Zoom</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  木魚 SDF  （X右=嘴端，Y上，Z前）
+// ══════════════════════════════════════════════
+function muyuSDF(x, y, z) {
+  const bx=x/1.18, by=y/0.80, bz=z/0.70;
+  let body = Math.sqrt(bx*bx+by*by+bz*bz)-1.0;
+  const ridgeX=(x-0.12)/0.88, ridgeY=(y-0.52)/0.50, ridgeZ=z/0.58;
+  body = Math.min(body, Math.sqrt(ridgeX*ridgeX+ridgeY*ridgeY+ridgeZ*ridgeZ)-1.0);
+  {
+    const slitCX=0.28, slitCY=0.10, halfX=0.70;
+    const cx2=Math.max(-halfX,Math.min(halfX,x-slitCX));
+    const lx=x-slitCX-cx2, ly=y-slitCY;
+    const ex=lx/0.14, ey=ly/0.13, ez=z/0.55;
+    body = Math.max(body, -(Math.sqrt(ex*ex+ey*ey+ez*ez)-1.0));
+  }
+  {
+    const taper=0.20+Math.max(0,-x-0.65)*0.25;
+    body = Math.min(body, Math.sqrt(((x+1.10)/0.30)**2+(y/taper)**2+(z/taper)**2)-1.0);
+  }
+  return body;
+}
+
+function generateSurface(count) {
+  const pts=[];
+  for(let i=0;i<count*50&&pts.length<count;i++){
+    const x=(Math.random()*2-1)*1.55, y=(Math.random()*2-1)*1.12, z=(Math.random()*2-1)*0.85;
+    const d=muyuSDF(x,y,z);
+    const nearSlit=(Math.abs(y-0.10)<0.25&&x>-0.5&&x<1.1);
+    const thr=nearSlit?0.048:0.062;
+    if(Math.abs(d)<thr){
+      const e=0.012;
+      const nx=(muyuSDF(x+e,y,z)-muyuSDF(x-e,y,z))/(2*e);
+      const ny=(muyuSDF(x,y+e,z)-muyuSDF(x,y-e,z))/(2*e);
+      const nz2=(muyuSDF(x,y,z+e)-muyuSDF(x,y,z-e))/(2*e);
+      const nl=Math.sqrt(nx*nx+ny*ny+nz2*nz2)||1;
+      const isEdge=Math.abs(nz2/nl)<0.22||Math.abs(ny/nl)>0.82;
+      pts.push([x,y,z,nx/nl,ny/nl,nz2/nl,isEdge?1:0]);
+    }
+  }
+  return pts;
+}
+
+function generateInterior(count) {
+  const pts=[];
+  for(let i=0;i<count*28&&pts.length<count;i++){
+    const x=(Math.random()*2-1)*1.55, y=(Math.random()*2-1)*1.12, z=(Math.random()*2-1)*0.85;
+    if(muyuSDF(x,y,z)<-0.07) pts.push([x,y,z]);
+  }
+  return pts;
+}
+
+console.log('Building muyu...');
+const MUYU_POINTS   = generateSurface(8000);
+const MUYU_INTERIOR = generateInterior(2000);
+console.log('surf',MUYU_POINTS.length,'int',MUYU_INTERIOR.length);
+
+// ══════════════════════════════════════════════
+const bgCanvas=document.getElementById('bg');
+const bgCtx=bgCanvas.getContext('2d');
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W=innerWidth, H=innerHeight;
+bgCanvas.width=canvas.width=W; bgCanvas.height=canvas.height=H;
+
+const MAX_CLICKS=100;
+const FILL_PER_CLICK=Math.ceil(MUYU_INTERIOR.length/MAX_CLICKS);
+const MAX_FILL=MUYU_INTERIOR.length;
+const SURF_PER_CLICK=12;
+
+let clicks=0,merit=0,selPhrase=null,selColor=null,inputOn=false;
+let exploding=false,explodeT=0,waitRebirth=false,explodeDone=false;
+let mScale=1.0,zoomBase=1.0,rotY=0,rotX=0.20;
+let birthing=false,birthP=0,frame=0;
+let fillProgress=0;
+let roundsToday=0;
+
+let base=[], fillParts=[], burst=[], orbits=[], floats=[], bubbles=[];
+
+// ══════════════════════════════════════════════
+//  Web Audio 系統
+// ══════════════════════════════════════════════
+let audioCtx=null;
+let bgmPlaying=false, bgmNodes={};
+
+function getAudioCtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// 木魚擊打聲：帶混響+延遲的電子木魚
+function playHit(){
+  const ac=getAudioCtx();
+  const now=ac.currentTime;
+
+  // 主體：短促敲擊音（兩個正弦疊加模擬空心木頭）
+  const freq1=420, freq2=680;
+  [freq1,freq2].forEach((freq,idx)=>{
+    const osc=ac.createOscillator();
+    const gain=ac.createGain();
+    osc.type='sine';
+    osc.frequency.setValueAtTime(freq*(1+idx*0.03), now);
+    osc.frequency.exponentialRampToValueAtTime(freq*0.65, now+0.18);
+    gain.gain.setValueAtTime(idx===0?0.55:0.30, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now+0.32);
+    osc.connect(gain);
+    gain.connect(reverbNode(ac));
+    osc.start(now);
+    osc.stop(now+0.35);
+  });
+
+  // 敲擊瞬態：短白噪聲衝擊
+  const buf=ac.createBuffer(1,ac.sampleRate*0.04,ac.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length)**2;
+  const ns=ac.createBufferSource();
+  const nsGain=ac.createGain();
+  const nsFilter=ac.createBiquadFilter();
+  nsFilter.type='bandpass';
+  nsFilter.frequency.value=900;
+  nsFilter.Q.value=1.2;
+  ns.buffer=buf;
+  nsGain.gain.setValueAtTime(0.18, now);
+  ns.connect(nsFilter);nsFilter.connect(nsGain);nsGain.connect(ac.destination);
+  ns.start(now);
+
+  // 延遲回聲（電子感）
+  const delay=ac.createDelay(1.0);
+  const delayGain=ac.createGain();
+  const feedback=ac.createGain();
+  delay.delayTime.value=0.28;
+  delayGain.gain.value=0.22;
+  feedback.gain.value=0.38;
+  const echoOsc=ac.createOscillator();
+  const echoGain=ac.createGain();
+  echoOsc.type='sine';
+  echoOsc.frequency.setValueAtTime(freq1, now);
+  echoOsc.frequency.exponentialRampToValueAtTime(freq1*0.6, now+0.5);
+  echoGain.gain.setValueAtTime(0.28, now);
+  echoGain.gain.exponentialRampToValueAtTime(0.001, now+0.6);
+  echoOsc.connect(echoGain);
+  echoGain.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(delayGain);
+  delayGain.connect(ac.destination);
+  echoOsc.start(now);
+  echoOsc.stop(now+0.65);
+}
+
+// 混響節點（簡易卷積型）
+function reverbNode(ac){
+  const convolver=ac.createConvolver();
+  const len=ac.sampleRate*1.8;
+  const irBuf=ac.createBuffer(2,len,ac.sampleRate);
+  for(let c=0;c<2;c++){
+    const ch=irBuf.getChannelData(c);
+    for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2);
+  }
+  convolver.buffer=irBuf;
+  const wet=ac.createGain(); wet.gain.value=0.38;
+  const dry=ac.createGain(); dry.gain.value=0.72;
+  const out=ac.createGain(); out.gain.value=0.9;
+  convolver.connect(wet); wet.connect(out);
+  out.connect(ac.destination);
+  // 返回一個可連接的入口（直接連destination同時送reverb）
+  const merge=ac.createGain(); merge.gain.value=1;
+  merge.connect(dry); dry.connect(ac.destination);
+  merge.connect(convolver);
+  return merge;
+}
+
+// ══════════════════════════════════════════════
+//  背景 BGM：數字禪意流 (Glitch Ambient / IDM)
+// ══════════════════════════════════════════════
+function startBGM(){
+  const ac=getAudioCtx();
+  const master=ac.createGain(); master.gain.value=0.0;
+  master.connect(ac.destination);
+  master.gain.linearRampToValueAtTime(0.55, ac.currentTime+3.5);
+
+  // ── Layer 1: Drone 低頻基音（兩個微失調正弦）
+  const droneFreqs=[54.5, 54.5*1.003, 81.8, 109.0];
+  const droneOscs=droneFreqs.map((f,i)=>{
+    const o=ac.createOscillator();
+    const g=ac.createGain();
+    o.type='sine';
+    o.frequency.value=f;
+    // 緩慢漂移音高
+    o.frequency.setValueAtTime(f, ac.currentTime);
+    g.gain.value=i<2?0.28:0.12;
+    o.connect(g); g.connect(master);
+    o.start();
+    return{osc:o,gain:g,base:f};
+  });
+  bgmNodes.droneOscs=droneOscs;
+
+  // ── Layer 2: Pad 中頻顆粒（granular-like：多個短命振盪器循環）
+  let padActive=true;
+  const padNotes=[220,277,330,370,440,554,660];
+  function spawnGrain(){
+    if(!padActive||!bgmPlaying) return;
+    const ac2=getAudioCtx();
+    const f=padNotes[Math.floor(Math.random()*padNotes.length)]*(0.995+Math.random()*0.01);
+    const o=ac2.createOscillator();
+    const g=ac2.createGain();
+    const filt=ac2.createBiquadFilter();
+    o.type=Math.random()>0.6?'sine':'triangle';
+    o.frequency.value=f;
+    filt.type='lowpass'; filt.frequency.value=1200+Math.random()*800; filt.Q.value=1.5;
+    const dur=0.8+Math.random()*2.4;
+    const vol=0.04+Math.random()*0.07;
+    g.gain.setValueAtTime(0,ac2.currentTime);
+    g.gain.linearRampToValueAtTime(vol, ac2.currentTime+dur*0.3);
+    g.gain.exponentialRampToValueAtTime(0.001, ac2.currentTime+dur);
+    o.connect(filt); filt.connect(g); g.connect(master);
+    o.start(ac2.currentTime); o.stop(ac2.currentTime+dur+0.05);
+    setTimeout(spawnGrain, 180+Math.random()*520);
+  }
+  spawnGrain();
+  bgmNodes.stopPad=()=>{ padActive=false; };
+
+  // ── Layer 3: Glitch 脈衝（隨機短促電子聲）
+  let glitchActive=true;
+  const glitchFreqs=[880,1320,440,660,1760,220];
+  function spawnGlitch(){
+    if(!glitchActive||!bgmPlaying) return;
+    const ac2=getAudioCtx();
+    const f=glitchFreqs[Math.floor(Math.random()*glitchFreqs.length)];
+    const o=ac2.createOscillator();
+    const g=ac2.createGain();
+    o.type='square';
+    o.frequency.value=f;
+    const dur=0.02+Math.random()*0.08;
+    g.gain.setValueAtTime(0.06+Math.random()*0.08, ac2.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac2.currentTime+dur);
+    o.connect(g); g.connect(master);
+    o.start(ac2.currentTime); o.stop(ac2.currentTime+dur+0.01);
+    setTimeout(spawnGlitch, 600+Math.random()*3200);
+  }
+  spawnGlitch();
+  bgmNodes.stopGlitch=()=>{ glitchActive=false; };
+
+  // ── Layer 4: 節拍底鼓（低頻正弦敲擊，極簡）
+  let kickActive=true;
+  const kickBPM=72;
+  const kickInterval=60000/kickBPM;
+  function spawnKick(){
+    if(!kickActive||!bgmPlaying) return;
+    const ac2=getAudioCtx();
+    const o=ac2.createOscillator();
+    const g=ac2.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(80, ac2.currentTime);
+    o.frequency.exponentialRampToValueAtTime(28, ac2.currentTime+0.22);
+    g.gain.setValueAtTime(0.32, ac2.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac2.currentTime+0.28);
+    o.connect(g); g.connect(master);
+    o.start(ac2.currentTime); o.stop(ac2.currentTime+0.3);
+    // 偶爾有一個拍子靜默（IDM不規則感）
+    const skip=Math.random()<0.18;
+    setTimeout(spawnKick, skip?kickInterval*2:kickInterval*(0.95+Math.random()*0.1));
+  }
+  spawnKick();
+  bgmNodes.stopKick=()=>{ kickActive=false; };
+
+  // ── Layer 5: 高頻顆粒噪聲氛圍（極輕微）
+  let shimmerActive=true;
+  function spawnShimmer(){
+    if(!shimmerActive||!bgmPlaying) return;
+    const ac2=getAudioCtx();
+    const buf=ac2.createBuffer(1, Math.floor(ac2.sampleRate*(0.05+Math.random()*0.15)), ac2.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.5;
+    const ns=ac2.createBufferSource();
+    const filt=ac2.createBiquadFilter();
+    const g=ac2.createGain();
+    filt.type='highpass'; filt.frequency.value=3500+Math.random()*2000;
+    g.gain.setValueAtTime(0.03+Math.random()*0.04, ac2.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac2.currentTime+0.2);
+    ns.buffer=buf;
+    ns.connect(filt); filt.connect(g); g.connect(master);
+    ns.start(ac2.currentTime);
+    setTimeout(spawnShimmer, 300+Math.random()*1800);
+  }
+  spawnShimmer();
+  bgmNodes.stopShimmer=()=>{ shimmerActive=false; };
+
+  bgmNodes.master=master;
+  bgmNodes.droneOscs=droneOscs;
+}
+
+function stopBGM(){
+  const ac=getAudioCtx();
+  if(bgmNodes.master){
+    bgmNodes.master.gain.linearRampToValueAtTime(0, ac.currentTime+2.0);
+    setTimeout(()=>{
+      if(bgmNodes.droneOscs) bgmNodes.droneOscs.forEach(n=>{ try{n.osc.stop();}catch(e){} });
+    },2200);
+  }
+  if(bgmNodes.stopPad) bgmNodes.stopPad();
+  if(bgmNodes.stopGlitch) bgmNodes.stopGlitch();
+  if(bgmNodes.stopKick) bgmNodes.stopKick();
+  if(bgmNodes.stopShimmer) bgmNodes.stopShimmer();
+  bgmNodes={};
+}
+
+function hslToRgb(h,s,l){
+  s/=100;l/=100;
+  const c=(1-Math.abs(2*l-1))*s,x2=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x2}else if(h<120){r=x2;g=c}else if(h<180){g=c;b=x2}
+  else if(h<240){g=x2;b=c}else if(h<300){r=x2;b=c}else{r=c;b=x2}
+  return{r:Math.round((r+m)*255),g:Math.round((g+m)*255),b:Math.round((b+m)*255)};
+}
+
+function mkBase(d){
+  const isEdge=d[6]===1;
+  return{
+    mx:d[0],my:d[1],mz:d[2],
+    nx:d[3]||0,ny:d[4]||0,nz:d[5]||0,
+    isEdge,
+    ox:0,oy:0,oz:0,
+    vox:0,voy:0,voz:0,
+    sx:0,sy:0,sz:0,
+    svx:0,svy:0,svz:0,
+    dax:(.004+Math.random()*.006)*(isEdge?.4:1),
+    day:(.004+Math.random()*.006)*(isEdge?.4:1),
+    daz:(.003+Math.random()*.005)*(isEdge?.4:1),
+    fpx:Math.random()*Math.PI*2,fpy:Math.random()*Math.PI*2,fpz:Math.random()*Math.PI*2,
+    ffx:.0025+Math.random()*.003,ffy:.002+Math.random()*.0025,ffz:.0015+Math.random()*.002,
+    rwvx:(Math.random()-.5)*0.0015,rwvy:(Math.random()-.5)*0.0015,rwvz:(Math.random()-.5)*0.0015,
+    tp:Math.random()*Math.PI*2,tf:.015+Math.random()*.02,
+    sz: isEdge?4.5+Math.random()*2.5:2.8+Math.random()*2.0,
+    a:  isEdge?0.80+Math.random()*0.20:0.55+Math.random()*0.30,
+  };
+}
+
+function mkFill(pt,rgb){
+  const angle=Math.random()*Math.PI*2, startR=1.9+Math.random()*0.5;
+  return{
+    mx:pt[0],my:pt[1],mz:pt[2],
+    cx:Math.cos(angle)*startR,cy:(Math.random()-.5)*1.5,cz:Math.sin(angle)*startR,
+    vx:0,vy:0,vz:0,arrived:false,
+    fpx:Math.random()*Math.PI*2,fpy:Math.random()*Math.PI*2,fpz:Math.random()*Math.PI*2,
+    ffx:.001+Math.random()*.002,ffy:.001+Math.random()*.002,ffz:.001+Math.random()*.002,
+    dax:.004+Math.random()*.004,day:.004+Math.random()*.004,daz:.003+Math.random()*.003,
+    rwvx:(Math.random()-.5)*0.002,rwvy:(Math.random()-.5)*0.002,rwvz:(Math.random()-.5)*0.002,
+    tp:Math.random()*Math.PI*2,tf:.008+Math.random()*.012,
+    sz:1.5+Math.random()*1.0,a:0,rgb,
+  };
+}
+
+function initFish(){
+  base=MUYU_POINTS.map(mkBase);
+  fillParts=[];burst=[];bubbles=[];
+  clicks=0;mScale=zoomBase;fillProgress=0;
+  birthing=true;birthP=0;
+  exploding=false;explodeT=0;waitRebirth=false;explodeDone=false;
+  const boom=document.getElementById('boom');if(boom)boom.style.opacity='0';
+  const rh=document.getElementById('rhint');if(rh)rh.style.opacity='0';
+}
+initFish();
+
+let interiorShuffled=[...MUYU_INTERIOR];
+(function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}})(interiorShuffled);
+
+function proj(x,y,z){
+  const cr=Math.cos(rotY),sr=Math.sin(rotY);
+  const rx=x*cr-z*sr, rz2=x*sr+z*cr;
+  const ct=Math.cos(rotX),st=Math.sin(rotX);
+  const ry2=y*ct-rz2*st, rz3=y*st+rz2*ct;
+  const CAM=5, sc=Math.min(W,H)*0.38*mScale;
+  const fov=CAM/(CAM+rz3+2.0);
+  return[W/2+rx*fov*sc, H/2+ry2*fov*sc, rz3, fov];
+}
+
+function hit(mx2,my2){
+  if(waitRebirth){
+    initFish();orbits=[];floats=[];
+    interiorShuffled=[...MUYU_INTERIOR];
+    (function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}})(interiorShuffled);
+    return;
+  }
+  if(exploding)return;
+  clicks++;merit++;
+  document.getElementById('mc').textContent=merit;
+  playHit();
+
+  // 衝擊波：找螢幕上最近粒子
+  const cr=Math.cos(rotY),sr=Math.sin(rotY),ct=Math.cos(rotX),st=Math.sin(rotX);
+  const sc=Math.min(W,H)*0.38*mScale, CAM=5;
+  let bestD=1e9,epicX=0,epicY=0,epicZ=0;
+  for(let i=0;i<base.length;i+=5){
+    const p=base[i];
+    const wx=p.mx+p.ox+p.sx, wy=p.my+p.oy+p.sy, wz=p.mz+p.oz+p.sz;
+    const rx2=wx*cr-wz*sr, rz2=wx*sr+wz*cr;
+    const ry2=wy*ct-rz2*st, rz3=wy*st+rz2*ct;
+    const fov=CAM/(CAM+rz3+2.0);
+    const px=W/2+rx2*fov*sc, py=H/2+ry2*fov*sc;
+    const d2=(px-mx2)**2+(py-my2)**2;
+    if(d2<bestD){bestD=d2;epicX=p.mx;epicY=p.my;epicZ=p.mz;}
+  }
+  const waveR=0.55;
+  for(let i=0;i<base.length;i++){
+    const p=base[i];
+    const dx=p.mx-epicX,dy=p.my-epicY,dz=p.mz-epicZ;
+    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if(dist<waveR&&dist>0){
+      const f=(1-dist/waveR)*0.06;
+      p.svx+=dx/dist*f; p.svy+=dy/dist*f; p.svz+=dz/dist*f;
+    }
+  }
+
+  const hue=Math.floor((clicks/MAX_CLICKS)*300);
+  const rgb=hslToRgb(hue,90,58);
+  fillProgress=clicks/MAX_CLICKS;
+
+  const startIdx=(clicks-1)*FILL_PER_CLICK;
+  for(let i=0;i<FILL_PER_CLICK&&fillParts.length<MAX_FILL;i++){
+    fillParts.push(mkFill(interiorShuffled[(startIdx+i)%interiorShuffled.length],rgb));
+  }
+
+  // 表面特效
+  for(let k=0;k<SURF_PER_CLICK;k++){
+    const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
+    const dist=.05+Math.random()*.1;
+    const sx=d[0]+(d[3]||0)*dist, sy=d[1]+(d[4]||0)*dist, sz2=d[2]+(d[5]||0)*dist;
+    const angle=Math.random()*Math.PI*2, startR=1.9+Math.random()*0.4;
+    fillParts.push({
+      mx:d[0],my:d[1],mz:d[2],
+      cx:Math.cos(angle)*startR,cy:(Math.random()-.5)*1.5,cz:Math.sin(angle)*startR,
+      vx:0,vy:0,vz:0,arrived:false,isSurf:true,surfLife:55,
+      fpx:Math.random()*Math.PI*2,fpy:Math.random()*Math.PI*2,fpz:Math.random()*Math.PI*2,
+      ffx:.003+Math.random()*.003,ffy:.002+Math.random()*.003,ffz:.002+Math.random()*.002,
+      dax:.006+Math.random()*.006,day:.006+Math.random()*.006,daz:.005+Math.random()*.005,
+      rwvx:(Math.random()-.5)*0.003,rwvy:(Math.random()-.5)*0.003,rwvz:(Math.random()-.5)*0.003,
+      tp:Math.random()*Math.PI*2,tf:.02+Math.random()*.02,
+      sz:2.5+Math.random()*1.5,a:1,rgb,
+    });
+  }
+
+  // 泡泡
+  for(let i=0;i<10+Math.floor(Math.random()*5);i++){
+    const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
+    const r=0.10+Math.random()*0.06;
+    bubbles.push({
+      mx:d[0]+(d[3]||0)*r,my:d[1]+(d[4]||0)*r,mz:d[2]+(d[5]||0)*r,
+      vy:-(0.005+Math.random()*.007),vx:(Math.random()-.5)*.003,vz:(Math.random()-.5)*.003,
+      sz:2.0+Math.random()*3.0,life:1.0,decay:.009+Math.random()*.006,rgb,tp:Math.random()*Math.PI*2,
+    });
+  }
+
+  if(selPhrase) spawnFloat(selPhrase,selColor,mx2,my2);
+  mScale=zoomBase*(1.0+(clicks/MAX_CLICKS)*0.45);
+  if(clicks>=MAX_CLICKS) explode();
+}
+
+function spawnFloat(text,color,sx,sy){
+  const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
+  const szFinal=13+Math.random()*4;
+  // szStart: 飛行起始大小（約2x），szFinal: 貼合後的大小
+  floats.push({text,color,sx,sy,tx:d[0]*2.2,ty:d[1]*2.2,tz:d[2]*2.2,prog:0,a:0,sz:szFinal,szStart:szFinal*2.2});
+}
+
+function explode(){
+  exploding=true;explodeT=0;explodeDone=false;waitRebirth=false;
+  roundsToday++;
+  const rcEl=document.getElementById('rc-num');
+  if(rcEl) rcEl.textContent=roundsToday;
+  const rcBox=document.getElementById('round-counter');
+  if(rcBox){ rcBox.style.opacity='1'; }
+  base.forEach(p=>{
+    const s=.022+Math.random()*.08;
+    p.svx=(p.nx||Math.random()-.5)*s+(Math.random()-.5)*.03;
+    p.svy=(p.ny||Math.random()-.5)*s+(Math.random()-.5)*.03+.008;
+    p.svz=(p.nz||Math.random()-.5)*s+(Math.random()-.5)*.03;
+  });
+  fillParts.forEach(p=>{
+    const s=.02+Math.random()*.08;
+    p.vx=(Math.random()-.5)*s;p.vy=(Math.random()-.5)*s+.008;p.vz=(Math.random()-.5)*s;
+  });
+  let boom=document.getElementById('boom');
+  if(!boom){boom=document.createElement('div');boom.id='boom';
+    boom.style.cssText='position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:42px;font-weight:900;pointer-events:none;z-index:200;opacity:0;text-shadow:0 0 40px #ff9900,0 0 80px #ff3300;letter-spacing:.15em;transition:opacity .5s;';
+    document.body.appendChild(boom);}
+  boom.innerHTML='功德圓滿<br><span style="font-size:18px;letter-spacing:.4em;font-weight:400;opacity:.7">MERIT OVERFLOW</span>';boom.style.opacity='1';
+  let rh=document.getElementById('rhint');
+  if(!rh){rh=document.createElement('div');rh.id='rhint';
+    rh.style.cssText='position:fixed;top:52%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,100,.6);font-size:16px;pointer-events:none;z-index:200;opacity:0;transition:opacity .5s;letter-spacing:.1em;';
+    document.body.appendChild(rh);}
+  rh.textContent='點擊任意處 · 再敲一輪';rh.style.opacity='0';
+}
+
+function addOrbit(text,color){
+  const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
+  orbits.push({text,color,ox:d[0],oy:d[1],oz:d[2],
+    spd:(.003+Math.random()*.004)*(Math.random()>.5?1:-1),
+    a:1,sz:12+Math.random()*4,life:1400+Math.floor(Math.random()*600),ang:0});
+}
+
+// ══════════════════════════════════════════════
+//  更新
+// ══════════════════════════════════════════════
+function update(){
+  frame++;
+  rotY+=.0038;
+  if(birthing){birthP=Math.min(1,birthP+.015);if(birthP>=1)birthing=false;}
+
+  const t=frame;
+
+  if(!exploding){
+    // base粒子：sin波 + 隨機游走雙驅動
+    for(let i=0;i<base.length;i++){
+      const p=base[i];
+      const tx=Math.sin(t*p.ffx+p.fpx)*p.dax;
+      const ty=Math.sin(t*p.ffy+p.fpy)*p.day;
+      const tz=Math.sin(t*p.ffz+p.fpz)*p.daz;
+      p.rwvx+=(Math.random()-.5)*0.00025; p.rwvx*=0.96;
+      p.rwvy+=(Math.random()-.5)*0.00025; p.rwvy*=0.96;
+      p.rwvz+=(Math.random()-.5)*0.00025; p.rwvz*=0.96;
+      p.vox+=(tx-p.ox)*0.035+p.rwvx;
+      p.voy+=(ty-p.oy)*0.035+p.rwvy;
+      p.voz+=(tz-p.oz)*0.035+p.rwvz;
+      p.vox*=0.82; p.voy*=0.82; p.voz*=0.82;
+      p.ox+=p.vox; p.oy+=p.voy; p.oz+=p.voz;
+      // 衝擊波彈性復原
+      p.svx+=(-p.sx)*0.20; p.svy+=(-p.sy)*0.20; p.svz+=(-p.sz)*0.20;
+      p.svx*=0.70; p.svy*=0.70; p.svz*=0.70;
+      p.sx+=p.svx; p.sy+=p.svy; p.sz+=p.svz;
+    }
+
+    // fillParts
+    for(let i=fillParts.length-1;i>=0;i--){
+      const p=fillParts[i];
+      if(p.isSurf){
+        // 表面特效：飛入後短暫漂浮然後消失
+        if(!p.arrived){
+          const dx=p.mx-p.cx,dy=p.my-p.cy,dz=p.mz-p.cz;
+          p.cx+=dx*.12;p.cy+=dy*.12;p.cz+=dz*.12;
+          p.a=Math.min(p.a+.06,1.0);
+          if(Math.sqrt(dx*dx+dy*dy+dz*dz)<.04){p.arrived=true;}
+        } else {
+          const t2=frame+i*13;
+          p.cx+=(p.mx+Math.sin(t2*p.ffx+p.fpx)*p.dax-p.cx)*.06;
+          p.cy+=(p.my+Math.sin(t2*p.ffy+p.fpy)*p.day-p.cy)*.06;
+          p.cz+=(p.mz+Math.sin(t2*p.ffz+p.fpz)*p.daz-p.cz)*.06;
+          p.surfLife--;
+          p.a=Math.max(0,p.surfLife/55);
+          if(p.surfLife<=0) fillParts.splice(i,1);
+        }
+      } else {
+        if(!p.arrived){
+          const dx=p.mx-p.cx,dy=p.my-p.cy,dz=p.mz-p.cz;
+          p.cx+=dx*.10;p.cy+=dy*.10;p.cz+=dz*.10;
+          p.a=Math.min(p.a+.035,.80);
+          if(Math.sqrt(dx*dx+dy*dy+dz*dz)<.04) p.arrived=true;
+        } else {
+          const t2=frame+i*19;
+          const tx=Math.sin(t2*p.ffx+p.fpx)*p.dax;
+          const ty=Math.sin(t2*p.ffy+p.fpy)*p.day;
+          const tz=Math.sin(t2*p.ffz+p.fpz)*p.daz;
+          p.rwvx+=(Math.random()-.5)*0.0003;p.rwvx*=0.95;
+          p.rwvy+=(Math.random()-.5)*0.0003;p.rwvy*=0.95;
+          p.rwvz+=(Math.random()-.5)*0.0003;p.rwvz*=0.95;
+          if(!p.ox) p.ox=0;if(!p.oy) p.oy=0;if(!p.oz) p.oz=0;
+          p.ox+=(tx-p.ox)*0.03+p.rwvx;
+          p.oy+=(ty-p.oy)*0.03+p.rwvy;
+          p.oz+=(tz-p.oz)*0.03+p.rwvz;
+          p.cx=p.mx+p.ox; p.cy=p.my+p.oy; p.cz=p.mz+p.oz;
+        }
+      }
+    }
+
+    // 泡泡
+    for(let i=bubbles.length-1;i>=0;i--){
+      const b=bubbles[i];
+      b.mx+=b.vx;b.my+=b.vy;b.mz+=b.vz;
+      b.vx+=(Math.random()-.5)*0.001;b.vz+=(Math.random()-.5)*0.001;
+      b.life-=b.decay;
+      if(b.life<=0) bubbles.splice(i,1);
+    }
+
+  } else {
+    explodeT++;
+    for(let i=0;i<base.length;i++){
+      const p=base[i];
+      p.svx*=.985;p.svy*=.985;p.svz*=.985;p.svy+=.0004;
+      p.sx+=p.svx;p.sy+=p.svy;p.sz+=p.svz;
+      p.a=Math.max(0,(p.a||.6)-.0025);
+    }
+    for(let i=0;i<fillParts.length;i++){
+      const p=fillParts[i];
+      p.vx*=.985;p.vy*=.985;p.vz*=.985;p.vy+=.0004;
+      p.cx+=p.vx;p.cy+=p.vy;p.cz+=p.vz;
+      p.a=Math.max(0,(p.a||.6)-.0025);
+    }
+    if(explodeT>300&&!explodeDone){
+      explodeDone=true;waitRebirth=true;
+      const boom=document.getElementById('boom');if(boom)boom.style.opacity='.6';
+      const rh=document.getElementById('rhint');if(rh)rh.style.opacity='1';
+    }
+  }
+
+  for(let i=floats.length-1;i>=0;i--){
+    const tf=floats[i];tf.prog=Math.min(1,tf.prog+.013);tf.a=Math.min(1,tf.a+.05);
+    if(tf.prog>=1){addOrbit(tf.text,tf.color);floats.splice(i,1);}
+  }
+  for(let i=orbits.length-1;i>=0;i--){
+    const tf=orbits[i];tf.ang+=tf.spd;tf.life--;
+    if(tf.life<100)tf.a=tf.life/100;
+    if(tf.life<=0)orbits.splice(i,1);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  繪製
+// ══════════════════════════════════════════════
+function draw(){
+  const birth=birthing?birthP*birthP*(3-2*birthP):1;
+  const cr=Math.cos(rotY),sr=Math.sin(rotY);
+  const ct=Math.cos(rotX),st=Math.sin(rotX);
+  const CAM=5, sc=Math.min(W,H)*0.38*mScale;
+
+  ctx.clearRect(0,0,W,H);
+  bgCtx.clearRect(0,0,W,H);
+  bgCtx.fillStyle='#000';bgCtx.fillRect(0,0,W,H);
+
+  // 背景光暈
+  if(fillProgress>0&&!exploding){
+    const fp=fillProgress, hue1=Math.floor(fp*240), hue2=(hue1+60)%360;
+    const gr=Math.min(W,H)*0.38*mScale;
+    const grad=bgCtx.createRadialGradient(W/2,H/2,0,W/2,H/2,gr);
+    grad.addColorStop(0,`hsla(${hue1},80%,60%,${fp*0.20})`);
+    grad.addColorStop(0.5,`hsla(${hue2},70%,45%,${fp*0.11})`);
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    bgCtx.globalAlpha=1;bgCtx.fillStyle=grad;bgCtx.fillRect(0,0,W,H);
+    if(fp>0.08){
+      const n=Math.floor(fp*25);
+      for(let i=0;i<n;i++){
+        const sx=W/2+(Math.sin(frame*.007+i*2.3)*0.6+Math.cos(frame*.005+i*1.7)*0.3)*sc;
+        const sy=H/2+(Math.sin(frame*.006+i*1.9)*0.4+Math.cos(frame*.008+i*2.1)*0.25)*sc*0.7;
+        const sr2=22+Math.sin(frame*.01+i)*14;
+        const sg=bgCtx.createRadialGradient(sx,sy,0,sx,sy,sr2*fp*2);
+        sg.addColorStop(0,`hsla(${(hue1+i*22)%360},80%,65%,${fp*0.07})`);
+        sg.addColorStop(1,'rgba(0,0,0,0)');
+        bgCtx.fillStyle=sg;
+        bgCtx.beginPath();bgCtx.arc(sx,sy,sr2*fp*2,0,Math.PI*2);bgCtx.fill();
+      }
+    }
+  }
+
+  function projP(wx,wy,wz){
+    const rx=wx*cr-wz*sr, rz2=wx*sr+wz*cr;
+    const ry2=wy*ct-rz2*st, rz3=wy*st+rz2*ct;
+    const fov=CAM/(CAM+rz3+2.0);
+    return[W/2+rx*fov*sc, H/2+ry2*fov*sc, rz3, fov];
+  }
+
+  ctx.globalCompositeOperation='lighter';
+  const t=frame;
+
+  // 表面粒子（銀白）
+  for(let i=0;i<base.length;i++){
+    const p=base[i];
+    const wx=p.mx+p.ox+p.sx, wy=p.my+p.oy+p.sy, wz=p.mz+p.oz+p.sz;
+    const pr=projP(wx,wy,wz);
+    if(pr[3]<=0) continue;
+    const tw=.7+.3*Math.sin(t*p.tf+p.tp);
+    const edgeMult=p.isEdge?1.0:0.55;
+    const sz2=Math.max(1.2, p.sz*pr[3]*mScale);
+    const alpha=p.a*tw*edgeMult*birth;
+    if(alpha<.01) continue;
+    ctx.globalAlpha=Math.min(1, alpha);
+    ctx.fillStyle=p.isEdge?'rgb(240,240,255)':'rgb(190,195,220)';
+    ctx.beginPath();ctx.arc(pr[0],pr[1],sz2,0,Math.PI*2);ctx.fill();
+  }
+
+  // 填充粒子（彩色）
+  for(let i=0;i<fillParts.length;i++){
+    const p=fillParts[i];
+    if(!p.a||p.a<.01) continue;
+    const pr=projP(p.cx,p.cy,p.cz);
+    if(pr[3]<=0) continue;
+    const tw=.7+.3*Math.sin(t*p.tf+p.tp);
+    const sz2=Math.max(1.0, p.sz*pr[3]*mScale);
+    const{r,g,b}=p.rgb;
+    ctx.globalAlpha=Math.min(1, p.a*tw);
+    ctx.fillStyle=`rgb(${r},${g},${b})`;
+    ctx.beginPath();ctx.arc(pr[0],pr[1],sz2,0,Math.PI*2);ctx.fill();
+  }
+
+  // 泡泡
+  for(let i=0;i<bubbles.length;i++){
+    const b=bubbles[i];
+    const pr=projP(b.mx,b.my,b.mz);
+    if(pr[3]<=0) continue;
+    const sz2=Math.max(1.0, b.sz*pr[3]*mScale);
+    ctx.globalAlpha=b.life*0.55;
+    ctx.fillStyle=`rgb(${b.rgb.r},${b.rgb.g},${b.rgb.b})`;
+    ctx.beginPath();ctx.arc(pr[0],pr[1],sz2*2.5,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=b.life*0.88;
+    ctx.fillStyle=`rgb(${Math.min(255,b.rgb.r+80)},${Math.min(255,b.rgb.g+80)},${Math.min(255,b.rgb.b+80)})`;
+    ctx.beginPath();ctx.arc(pr[0],pr[1],sz2*0.7,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.globalCompositeOperation='source-over';
+
+  // 漂浮文字
+  for(let i=0;i<floats.length;i++){
+    const tf=floats[i];
+    const pr=proj(tf.tx,tf.ty,tf.tz);
+    const pg=tf.prog*tf.prog*(3-2*tf.prog);
+    // 字號從起始大小漸縮到最終大小
+    const szStart=tf.szStart||tf.sz*2.2;
+    const curSz=szStart+(tf.sz-szStart)*pg;
+    ctx.globalAlpha=tf.a;ctx.fillStyle=tf.color;
+    ctx.font=`bold ${Math.round(curSz)}px 'Microsoft JhengHei',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor=tf.color;ctx.shadowBlur=16;
+    ctx.fillText(tf.text,tf.sx+(pr[0]-tf.sx)*pg,tf.sy+(pr[1]-tf.sy)*pg-50*(1-tf.prog));
+    ctx.shadowBlur=0;
+  }
+
+  // 環繞文字
+  if(!exploding){
+    for(let i=0;i<orbits.length;i++){
+      const tf=orbits[i];
+      const ca=Math.cos(tf.ang),sa=Math.sin(tf.ang);
+      const pr=proj(tf.ox*ca-tf.oz*sa,tf.oy,tf.ox*sa+tf.oz*ca);
+      const vis=Math.max(0,Math.min(1,(pr[2]+1.2)/1.2));
+      if(vis<=0) continue;
+      ctx.globalAlpha=tf.a*vis*birth;ctx.fillStyle=tf.color;
+      ctx.font=`bold ${Math.max(8,Math.floor(tf.sz*pr[3]*mScale))}px 'Microsoft JhengHei',sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.shadowColor=tf.color;ctx.shadowBlur=8;
+      ctx.fillText(tf.text,pr[0],pr[1]);ctx.shadowBlur=0;
+    }
+  }
+
+  if(fillProgress>0&&fillProgress<1&&!exploding){
+    ctx.globalAlpha=.25;
+    ctx.fillStyle=`hsl(${fillProgress*240},80%,60%)`;
+    ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(`${Math.round(fillProgress*100)}%`,W/2,H-18);
+  }
+  ctx.globalAlpha=1;
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+loop();
+
+// ══════════════════════════════════════════════
+//  輸入（無拖曳，只有點擊 + 滾輪縮放）
+// ══════════════════════════════════════════════
+let mx=W/2,my=H/2;
+const cur=document.getElementById('cursor');
+
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  cur.style.left=mx+'px';cur.style.top=my+'px';
+});
+
+document.addEventListener('click',e=>{
+  if(e.target.closest('#phrase-panel')||e.target.closest('#cp')) return;
+  cur.classList.add('hit');setTimeout(()=>cur.classList.remove('hit'),160);
+  hit(e.clientX,e.clientY);
+});
+
+document.addEventListener('wheel',e=>{
+  e.preventDefault();
+  zoomBase=Math.max(0.4,Math.min(3.0,zoomBase+(e.deltaY>0?-0.08:0.08)));
+  mScale=zoomBase*(1.0+(clicks/MAX_CLICKS)*0.45);
+},{passive:false});
+
+document.querySelectorAll('.pb').forEach(btn=>{
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const t=btn.dataset.t,c=btn.dataset.c;
+    if(selPhrase===t){selPhrase=null;selColor=null;btn.classList.remove('on');}
+    else{document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));selPhrase=t;selColor=c;btn.classList.add('on');}
+  });
+});
+
+const ci=document.getElementById('ci');
+ci.addEventListener('click',e=>{
+  e.stopPropagation();
+  if(!inputOn){inputOn=true;ci.classList.add('on');ci.removeAttribute('readonly');ci.focus();}
+  else{inputOn=false;ci.classList.remove('on');ci.setAttribute('readonly',true);ci.blur();}
+});
+document.addEventListener('click',e=>{
+  if(e.target===ci) return;
+  if(inputOn&&!e.target.closest('#cp')){inputOn=false;ci.classList.remove('on');ci.setAttribute('readonly',true);ci.blur();}
+});
+ci.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&inputOn){
+    const text=ci.value.trim();
+    if(text){spawnFloat(text+' +1','#e8d4ff',mx,my);merit++;document.getElementById('mc').textContent=merit;}
+    e.preventDefault();
+  }
+  e.stopPropagation();
+});
+ci.addEventListener('keyup',e=>e.stopPropagation());
+ci.addEventListener('mousedown',e=>e.stopPropagation());
+window.addEventListener('resize',()=>{
+  W=innerWidth;H=innerHeight;
+  bgCanvas.width=canvas.width=W;bgCanvas.height=canvas.height=H;
+});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+
+// BGM 首次互動後自動啟動（瀏覽器autoplay政策要求使用者互動）
+let bgmStarted=false;
+function tryStartBGM(){
+  if(!bgmStarted){
+    bgmStarted=true;
+    bgmPlaying=true;
+    startBGM();
+  }
+}
+document.addEventListener('click', tryStartBGM, {once:true});
+document.addEventListener('keydown', tryStartBGM, {once:true});
+</script>
+</body>
+</html>
