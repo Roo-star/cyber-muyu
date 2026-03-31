@@ -1033,8 +1033,7 @@ document.addEventListener('mousemove',e=>{
 });
 
 document.addEventListener('click',e=>{
-  // 只有直接點擊 input 框本身時才不敲木魚（避免打字干擾）
-  if(e.target===ci) return;
+  if(e.target.closest('#phrase-panel')||e.target.closest('#cp')) return;
   cur.classList.add('hit');setTimeout(()=>cur.classList.remove('hit'),160);
   hit(e.clientX,e.clientY);
 });
@@ -1073,8 +1072,7 @@ document.addEventListener('touchend',e=>{
   if(e.changedTouches.length===1&&e.touches.length===0){
     const t=e.changedTouches[0];
     const el=document.elementFromPoint(t.clientX,t.clientY);
-    // 只有直接點到 input 框本身時不敲木魚
-    if(el&&el===ci) return;
+    if(el&&(el.closest('#phrase-panel')||el.closest('#cp')||el.closest('#hud-top'))) return;
     mx=t.clientX;my=t.clientY;
     hit(t.clientX,t.clientY);
   }
@@ -1082,7 +1080,7 @@ document.addEventListener('touchend',e=>{
 
 document.querySelectorAll('.pb').forEach(btn=>{
   btn.addEventListener('click',e=>{
-    // 不再 stopPropagation，讓 click 冒泡到 document 觸發敲擊
+    e.stopPropagation();
     const t=btn.dataset.t,c=btn.dataset.c;
     if(selPhrase===t){selPhrase=null;selColor=null;btn.classList.remove('on');}
     else{document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));selPhrase=t;selColor=c;btn.classList.add('on');}
