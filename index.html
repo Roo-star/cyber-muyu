@@ -164,15 +164,20 @@ canvas{display:block;position:absolute;top:0;left:0}
   background:rgba(255,255,255,.03);
   border:1px solid rgba(255,200,100,.14);
   color:rgba(255,230,180,.9);padding:7px 12px;
-  font-size:12px;width:100%;outline:none;cursor:pointer;
+  font-size:12px;width:100%;outline:none;cursor:text;
   transition:all .25s;caret-color:#ffd88a;
   font-family:var(--font-zh);
   text-shadow:0 0 6px rgba(255,200,100,.15);
+  -webkit-user-select:text;user-select:text;
+  /* 讓 iOS 不把它當成不可互動元素 */
+  -webkit-appearance:none;appearance:none;
+  border-radius:0;
 }
 #ci::placeholder{color:rgba(255,200,100,.20);font-family:var(--font-en);font-size:10px}
-#ci.on{
+#ci:focus,#ci.on{
   border-color:rgba(255,180,60,.6);background:rgba(255,180,60,.05);
-  box-shadow:0 0 12px rgba(255,180,60,.18);cursor:text;
+  box-shadow:0 0 12px rgba(255,180,60,.18);
+  outline:none;
 }
 
 /* ═══════════════════════════════════════════
@@ -259,7 +264,7 @@ canvas{display:block;position:absolute;top:0;left:0}
     <div class="scanline"></div>
     <span class="data-tag" style="top:2px;right:10px">NODE.INPUT</span>
     <div id="cl">Chant your words</div>
-    <input id="ci" type="text" inputmode="text" placeholder="type here…" maxlength="24" readonly/>
+    <input id="ci" type="text" inputmode="text" enterkeyhint="send" placeholder="type here…" maxlength="24"/>
   </div>
 </div>
 
@@ -316,8 +321,12 @@ function generateInterior(count) {
 }
 
 console.log('Building muyu...');
-const MUYU_POINTS   = generateSurface(8000);
-const MUYU_INTERIOR = generateInterior(2000);
+// 移動端降低粒子數量避免卡頓
+const isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||innerWidth<=768;
+const SURF_COUNT=isMobile?3000:8000;
+const INT_COUNT=isMobile?800:2000;
+const MUYU_POINTS   = generateSurface(SURF_COUNT);
+const MUYU_INTERIOR = generateInterior(INT_COUNT);
 console.log('surf',MUYU_POINTS.length,'int',MUYU_INTERIOR.length);
 
 // ══════════════════════════════════════════════
@@ -331,7 +340,8 @@ bgCanvas.width=canvas.width=W; bgCanvas.height=canvas.height=H;
 const MAX_CLICKS=100;
 const FILL_PER_CLICK=Math.ceil(MUYU_INTERIOR.length/MAX_CLICKS);
 const MAX_FILL=MUYU_INTERIOR.length;
-const SURF_PER_CLICK=12;
+const MAX_SURF_PARTS=isMobile?40:120; // 移動端限制表面特效粒子上限
+const SURF_PER_CLICK=isMobile?4:12;
 
 let clicks=0,merit=0,selPhrase=null,selColor=null,inputOn=false;
 let exploding=false,explodeT=0,waitRebirth=false,explodeDone=false;
@@ -687,8 +697,9 @@ function hit(mx2,my2){
     fillParts.push(mkFill(interiorShuffled[(startIdx+i)%interiorShuffled.length],rgb));
   }
 
-  // 表面特效
-  for(let k=0;k<SURF_PER_CLICK;k++){
+  // 表面特效（移動端限制上限）
+  const surfParts=fillParts.filter(p=>p.isSurf);
+  for(let k=0;k<SURF_PER_CLICK&&surfParts.length+k<MAX_SURF_PARTS;k++){
     const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
     const dist=.05+Math.random()*.1;
     const sx=d[0]+(d[3]||0)*dist, sy=d[1]+(d[4]||0)*dist, sz2=d[2]+(d[5]||0)*dist;
@@ -707,7 +718,7 @@ function hit(mx2,my2){
   }
 
   // 泡泡
-  for(let i=0;i<10+Math.floor(Math.random()*5);i++){
+  for(let i=0;i<(isMobile?3:10)+Math.floor(Math.random()*(isMobile?2:5));i++){
     const d=MUYU_POINTS[Math.floor(Math.random()*MUYU_POINTS.length)];
     const r=0.10+Math.random()*0.06;
     bubbles.push({
@@ -1077,41 +1088,34 @@ document.querySelectorAll('.pb').forEach(btn=>{
 });
 
 const ci=document.getElementById('ci');
-function openInput(){
+// 輸入框始終可編輯，不使用 readonly，純靠 focus/blur 管理狀態
+ci.addEventListener('focus',e=>{
   inputOn=true;
   ci.classList.add('on');
-  ci.removeAttribute('readonly');
-  ci.focus();
-  ci.click();
-}
-function closeInput(){
+});
+ci.addEventListener('blur',e=>{
   inputOn=false;
   ci.classList.remove('on');
-  ci.blur();
-  ci.setAttribute('readonly','true');
-}
-ci.addEventListener('touchstart',e=>{
-  e.stopPropagation();
-  if(!inputOn){ openInput(); } else { closeInput(); }
-},{passive:false});
-ci.addEventListener('click',e=>{
-  e.stopPropagation();
-  if(!inputOn){ openInput(); } else { closeInput(); }
 });
-document.addEventListener('click',e=>{
-  if(e.target===ci) return;
-  if(inputOn&&!e.target.closest('#cp')) closeInput();
-});
+// 阻止輸入框的點擊/觸控冒泡到全域，避免觸發敲擊
+ci.addEventListener('click',e=>e.stopPropagation());
+ci.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+ci.addEventListener('touchend',e=>e.stopPropagation(),{passive:true});
+ci.addEventListener('mousedown',e=>e.stopPropagation());
 ci.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&inputOn){
+  if(e.key==='Enter'){
     const text=ci.value.trim();
-    if(text){spawnFloat(text+' +1','#e8d4ff',mx,my);merit++;document.getElementById('mc').textContent=merit;}
+    if(text){
+      spawnFloat(text+' +1','#e8d4ff',mx,my);
+      merit++;
+      document.getElementById('mc').textContent=merit;
+      ci.value='';
+    }
     e.preventDefault();
   }
   e.stopPropagation();
 });
 ci.addEventListener('keyup',e=>e.stopPropagation());
-ci.addEventListener('mousedown',e=>e.stopPropagation());
 window.addEventListener('resize',()=>{
   W=innerWidth;H=innerHeight;
   bgCanvas.width=canvas.width=W;bgCanvas.height=canvas.height=H;
