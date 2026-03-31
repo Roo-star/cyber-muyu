@@ -223,7 +223,7 @@ canvas{display:block;position:absolute;top:0;left:0}
 <!-- HUD 頂部 -->
 <div id="hud-top">
   <div class="title">Cyber Muyu · Digital Ritual</div>
-  <div class="merit-val">功德 · MERIT <span id="mc">0</span></div>
+  <div class="merit-val">功德 <span id="mc">0</span></div>
 </div>
 
 <!-- HUD 底部 -->
@@ -248,7 +248,7 @@ canvas{display:block;position:absolute;top:0;left:0}
   <div id="hud-center">
     <div id="round-counter">
       <div class="rc-main">已敲 <span id="rc-num">0</span> 輪</div>
-      <div class="rc-sub">The wooden fish remembers you.</div>
+      <div class="rc-sub">The fish remembers.</div>
     </div>
     <div id="tap-hint">Tap to beat · Scroll to zoom</div>
   </div>
@@ -259,7 +259,7 @@ canvas{display:block;position:absolute;top:0;left:0}
     <div class="scanline"></div>
     <span class="data-tag" style="top:2px;right:10px">NODE.INPUT</span>
     <div id="cl">Chant your words</div>
-    <input id="ci" type="text" inputmode="text" placeholder="type here…" maxlength="24" readonly/>
+    <input id="ci" type="text" placeholder="type here…" maxlength="24" readonly/>
   </div>
 </div>
 
@@ -1077,30 +1077,20 @@ document.querySelectorAll('.pb').forEach(btn=>{
 });
 
 const ci=document.getElementById('ci');
-function openInput(){
-  inputOn=true;
-  ci.classList.add('on');
-  ci.removeAttribute('readonly');
-  ci.focus();
-  ci.click();
-}
-function closeInput(){
-  inputOn=false;
-  ci.classList.remove('on');
-  ci.blur();
-  ci.setAttribute('readonly','true');
-}
-ci.addEventListener('touchstart',e=>{
+function activateInput(e){
   e.stopPropagation();
-  if(!inputOn){ openInput(); } else { closeInput(); }
-},{passive:false});
-ci.addEventListener('click',e=>{
-  e.stopPropagation();
-  if(!inputOn){ openInput(); } else { closeInput(); }
-});
+  if(!inputOn){
+    inputOn=true;ci.classList.add('on');ci.removeAttribute('readonly');
+    setTimeout(()=>ci.focus(),50);
+  } else {
+    inputOn=false;ci.classList.remove('on');ci.setAttribute('readonly',true);ci.blur();
+  }
+}
+ci.addEventListener('click',activateInput);
+ci.addEventListener('touchend',e=>{e.preventDefault();activateInput(e);});
 document.addEventListener('click',e=>{
   if(e.target===ci) return;
-  if(inputOn&&!e.target.closest('#cp')) closeInput();
+  if(inputOn&&!e.target.closest('#cp')){inputOn=false;ci.classList.remove('on');ci.setAttribute('readonly',true);ci.blur();}
 });
 ci.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&inputOn){
