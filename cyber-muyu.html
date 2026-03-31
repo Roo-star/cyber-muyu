@@ -1033,8 +1033,7 @@ document.addEventListener('mousemove',e=>{
 });
 
 document.addEventListener('click',e=>{
-  // 只有直接點擊 input 框本身時才不敲木魚（避免打字干擾）
-  if(e.target===ci) return;
+  if(e.target.closest('#phrase-panel')||e.target.closest('#cp')) return;
   cur.classList.add('hit');setTimeout(()=>cur.classList.remove('hit'),160);
   hit(e.clientX,e.clientY);
 });
@@ -1073,8 +1072,7 @@ document.addEventListener('touchend',e=>{
   if(e.changedTouches.length===1&&e.touches.length===0){
     const t=e.changedTouches[0];
     const el=document.elementFromPoint(t.clientX,t.clientY);
-    // 只有直接點到 input 框本身時不敲木魚
-    if(el&&el===ci) return;
+    if(el&&(el.closest('#phrase-panel')||el.closest('#cp')||el.closest('#hud-top'))) return;
     mx=t.clientX;my=t.clientY;
     hit(t.clientX,t.clientY);
   }
@@ -1082,7 +1080,7 @@ document.addEventListener('touchend',e=>{
 
 document.querySelectorAll('.pb').forEach(btn=>{
   btn.addEventListener('click',e=>{
-    // 不再 stopPropagation，讓 click 冒泡到 document 觸發敲擊
+    e.stopPropagation();
     const t=btn.dataset.t,c=btn.dataset.c;
     if(selPhrase===t){selPhrase=null;selColor=null;btn.classList.remove('on');}
     else{document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));selPhrase=t;selColor=c;btn.classList.add('on');}
@@ -1108,12 +1106,9 @@ ci.addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     const text=ci.value.trim();
     if(text){
-      const color='#e8d4ff';
-      spawnFloat(text+' +1',color,mx,my);
+      spawnFloat(text+' +1','#e8d4ff',mx,my);
       merit++;
       document.getElementById('mc').textContent=merit;
-      // 儲存到 Firebase（去重，限 20 條）
-      if(typeof window.fbSaveChant==='function') window.fbSaveChant(text,color);
       ci.value='';
     }
     e.preventDefault();
@@ -1138,82 +1133,6 @@ function tryStartBGM(){
 }
 document.addEventListener('click', tryStartBGM, {once:true});
 document.addEventListener('keydown', tryStartBGM, {once:true});
-
-// Firebase 在主腳本結束後非同步初始化，完全不影響主程式
-window.fbSaveChant=null; // 預設 null，Firebase 載入後才賦值
-<script>
-// ══════════════════════════════════════════════
-//  Firebase 共享文字記憶（完全隔離，失敗不影響主程式）
-// ══════════════════════════════════════════════
-try {
-  const MAX_CHANTS=20, SHOW_ON_LOAD=5;
-  const FB_CFG={
-    apiKey:"AIzaSyArf8vfY5Y8y6EIWMd59SEXOcUramkJFxg",
-    authDomain:"cyber-muyu.firebaseapp.com",
-    databaseURL:"https://cyber-muyu-default-rtdb.firebaseio.com",
-    projectId:"cyber-muyu",
-    storageBucket:"cyber-muyu.firebasestorage.app",
-    messagingSenderId:"144131494504",
-    appId:"1:144131494504:web:a0c5969229217096ff21dd"
-  };
-
-  function fbLoadScript(src){
-    return new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src=src;
-      s.onload=res;
-      s.onerror=()=>rej(new Error('load fail: '+src));
-      document.head.appendChild(s);
-    });
-  }
-
-  Promise.all([
-    fbLoadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'),
-    fbLoadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js')
-  ]).then(()=>{
-    try{
-      if(!firebase.apps.length) firebase.initializeApp(FB_CFG);
-      const db=firebase.database();
-      const ref=db.ref('chants');
-
-      // 頁面載入：讀取並隨機顯示 0~5 條
-      ref.orderByChild('ts').limitToLast(MAX_CHANTS).once('value').then(snap=>{
-        try{
-          const items=[];
-          snap.forEach(c=>{const v=c.val();if(v&&v.text)items.push({text:v.text,color:v.color||'#e8d4ff'});});
-          if(!items.length) return;
-          items.sort(()=>Math.random()-.5);
-          const count=Math.floor(Math.random()*(Math.min(SHOW_ON_LOAD,items.length)+1));
-          setTimeout(()=>{
-            try{ for(let i=0;i<count;i++) addOrbit(items[i].text,items[i].color); }
-            catch(e){ console.warn('FB orbit:',e); }
-          },2500);
-        }catch(e){console.warn('FB read parse:',e);}
-      }).catch(e=>console.warn('FB read:',e));
-
-      // 寫入函數
-      window.fbSaveChant=function(text,color){
-        try{
-          ref.orderByChild('text').equalTo(text).once('value').then(snap=>{
-            if(snap.exists()) return;
-            ref.orderByChild('ts').once('value').then(allSnap=>{
-              const keys=[];
-              allSnap.forEach(c=>keys.push({key:c.key,ts:c.val().ts}));
-              const toDelete=keys.length-(MAX_CHANTS-1);
-              if(toDelete>0){
-                keys.sort((a,b)=>a.ts-b.ts);
-                const del={};
-                for(let i=0;i<toDelete;i++) del['chants/'+keys[i].key]=null;
-                db.ref('/').update(del);
-              }
-              ref.push({text,color,ts:firebase.database.ServerValue.TIMESTAMP});
-            });
-          }).catch(e=>console.warn('FB write check:',e));
-        }catch(e){console.warn('FB write:',e);}
-      };
-    }catch(e){console.warn('Firebase init:',e);}
-  }).catch(e=>console.warn('Firebase SDK:',e));
-} catch(e){ console.warn('Firebase block:',e); }
 </script>
 </body>
 </html>
