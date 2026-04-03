@@ -122,6 +122,11 @@ canvas{display:block;position:absolute;top:0;left:0}
   color:#ffd88a;box-shadow:0 0 8px rgba(255,180,60,.25),inset 0 0 12px rgba(255,180,60,.06);
   text-shadow:0 0 12px rgba(255,180,60,.5);
 }
+#custom-phrase-list:not(:empty){margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,200,100,.08);}
+.pb-row{display:flex;align-items:center;width:100%;gap:2px;margin-bottom:3px;}
+.pb-row .pb{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.pb-del{flex-shrink:0;background:none;border:none;color:rgba(255,100,100,.4);font-size:12px;padding:0 4px;cursor:pointer;line-height:1;}
+.pb-del:hover{color:rgba(255,100,100,.9);}
 
 /* ── 中：提示 ── */
 #hud-center{
@@ -247,6 +252,7 @@ canvas{display:block;position:absolute;top:0;left:0}
     <button class="pb" data-t="世界和平 World Peace +1" data-c="#cc88ff">世界和平 · Peace +1</button>
     <button class="pb" data-t="請饒了我幹的壞事 Purge My Sins +1" data-c="#ff88cc">滌罪 · Purge Sins +1</button>
     <button class="pb" data-t="只有豬肉卷才是永恆的 Only pork rolls are eternal +1" data-c="#ffaa44">豬肉卷永恆 · Eternal +1</button>
+    <div id="custom-phrase-list"></div>
   </div>
 
   <!-- 中：提示 + 輪數 -->
@@ -1133,6 +1139,71 @@ function tryStartBGM(){
 }
 document.addEventListener('click', tryStartBGM, {once:true});
 document.addEventListener('keydown', tryStartBGM, {once:true});
+
+// ── 自定義文字記憶（localStorage，安全隔離）──
+try {
+  var CKEY='muyu_customs';
+  var CCOLORS=['#e8d4ff','#aaddff','#ffe4aa','#aaffcc','#ffaacc','#ccddff','#ffccaa'];
+  var customs=[];
+  try{ customs=JSON.parse(localStorage.getItem(CKEY)||'[]'); }catch(e){ customs=[]; }
+  var clist=document.getElementById('custom-phrase-list');
+
+  function cpAttach(btn){
+    btn.addEventListener('click',function(e){
+      var t=btn.dataset.t, c=btn.dataset.c;
+      if(selPhrase===t){ selPhrase=null; selColor=null; btn.classList.remove('on'); }
+      else{ document.querySelectorAll('.pb').forEach(function(b){b.classList.remove('on');}); selPhrase=t; selColor=c; btn.classList.add('on'); }
+    });
+  }
+
+  function cpRender(){
+    clist.innerHTML='';
+    customs.forEach(function(item,idx){
+      var row=document.createElement('div'); row.className='pb-row';
+      var btn=document.createElement('button'); btn.className='pb';
+      btn.dataset.t=item.t; btn.dataset.c=item.c;
+      btn.textContent=item.t; btn.title=item.t;
+      cpAttach(btn);
+      var del=document.createElement('button'); del.className='pb-del'; del.textContent='×';
+      del.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(selPhrase===item.t){ selPhrase=null; selColor=null; }
+        customs.splice(idx,1);
+        try{ localStorage.setItem(CKEY,JSON.stringify(customs)); }catch(e){}
+        cpRender();
+      });
+      row.appendChild(btn); row.appendChild(del); clist.appendChild(row);
+    });
+  }
+  cpRender();
+
+  // 攔截 Enter 發送，追加到清單
+  var _origKD=ci.onkeydown;
+  ci.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      var raw=ci.value.trim();
+      if(raw){
+        var full=raw+' +1';
+        var col=CCOLORS[Math.floor(Math.random()*CCOLORS.length)];
+        // 去重
+        if(!customs.some(function(c){return c.t===full;})){
+          customs.push({t:full,c:col});
+          try{ localStorage.setItem(CKEY,JSON.stringify(customs)); }catch(e){}
+          cpRender();
+        }
+        // 自動選中
+        document.querySelectorAll('.pb').forEach(function(b){b.classList.remove('on');});
+        selPhrase=full; selColor=col;
+        setTimeout(function(){
+          var nb=clist.querySelector('.pb');
+          // 找到對應的按鈕
+          var all=clist.querySelectorAll('.pb');
+          all.forEach(function(b){ if(b.dataset.t===full) b.classList.add('on'); });
+        },0);
+      }
+    }
+  });
+} catch(e){ console.warn('custom chant error:',e); }
 </script>
 </body>
 </html>
