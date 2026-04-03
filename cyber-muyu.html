@@ -123,22 +123,6 @@ canvas{display:block;position:absolute;top:0;left:0}
   text-shadow:0 0 12px rgba(255,180,60,.5);
 }
 
-/* ── 自定義文字區 ── */
-#custom-phrase-list{display:flex;flex-direction:column;gap:3px;width:100%}
-#custom-phrase-list:not(:empty){margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,200,100,.08);}
-.pb-custom{
-  display:flex;align-items:center;gap:0;width:100%;
-}
-.pb-custom .pb{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pb-del{
-  flex-shrink:0;width:18px;height:18px;
-  background:none;border:none;
-  color:rgba(255,100,100,.35);font-size:11px;line-height:18px;text-align:center;
-  cursor:pointer;padding:0;margin-left:2px;
-  transition:color .2s;
-}
-.pb-del:hover{color:rgba(255,100,100,.85);}
-
 /* ── 中：提示 ── */
 #hud-center{
   flex:1;display:flex;flex-direction:column;align-items:center;
@@ -263,8 +247,6 @@ canvas{display:block;position:absolute;top:0;left:0}
     <button class="pb" data-t="世界和平 World Peace +1" data-c="#cc88ff">世界和平 · Peace +1</button>
     <button class="pb" data-t="請饒了我幹的壞事 Purge My Sins +1" data-c="#ff88cc">滌罪 · Purge Sins +1</button>
     <button class="pb" data-t="只有豬肉卷才是永恆的 Only pork rolls are eternal +1" data-c="#ffaa44">豬肉卷永恆 · Eternal +1</button>
-    <!-- 用戶自定義文字將動態插入於此 -->
-    <div id="custom-phrase-list"></div>
   </div>
 
   <!-- 中：提示 + 輪數 -->
@@ -1051,8 +1033,7 @@ document.addEventListener('mousemove',e=>{
 });
 
 document.addEventListener('click',e=>{
-  // 只有直接點擊 input 框本身時才不敲木魚（避免打字干擾）
-  if(e.target===ci) return;
+  if(e.target.closest('#phrase-panel')||e.target.closest('#cp')) return;
   cur.classList.add('hit');setTimeout(()=>cur.classList.remove('hit'),160);
   hit(e.clientX,e.clientY);
 });
@@ -1091,68 +1072,20 @@ document.addEventListener('touchend',e=>{
   if(e.changedTouches.length===1&&e.touches.length===0){
     const t=e.changedTouches[0];
     const el=document.elementFromPoint(t.clientX,t.clientY);
-    // 只有直接點到 input 框本身時不敲木魚
-    if(el&&el===ci) return;
+    if(el&&(el.closest('#phrase-panel')||el.closest('#cp')||el.closest('#hud-top'))) return;
     mx=t.clientX;my=t.clientY;
     hit(t.clientX,t.clientY);
   }
 },{passive:true});
 
-// ── 自定義文字管理 ──
-const CUSTOM_KEY='muyu_custom_chants';
-const CUSTOM_COLORS=['#e8d4ff','#aaddff','#ffe4aa','#aaffcc','#ffaacc','#ccddff','#ffccaa'];
-let customChants=[];
-try{ customChants=JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]'); }catch(e){}
-
-const customList=document.getElementById('custom-phrase-list');
-
-function attachPbEvent(btn){
+document.querySelectorAll('.pb').forEach(btn=>{
   btn.addEventListener('click',e=>{
-    // 不再 stopPropagation，讓 click 冒泡到 document 觸發敲擊
+    e.stopPropagation();
     const t=btn.dataset.t,c=btn.dataset.c;
     if(selPhrase===t){selPhrase=null;selColor=null;btn.classList.remove('on');}
     else{document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));selPhrase=t;selColor=c;btn.classList.add('on');}
   });
-}
-
-function renderCustomChants(){
-  customList.innerHTML='';
-  customChants.forEach((item,idx)=>{
-    const wrap=document.createElement('div');
-    wrap.className='pb-custom';
-    const btn=document.createElement('button');
-    btn.className='pb';
-    btn.dataset.t=item.text;
-    btn.dataset.c=item.color;
-    btn.textContent=item.text;
-    btn.title=item.text;
-    attachPbEvent(btn);
-    const del=document.createElement('button');
-    del.className='pb-del';
-    del.textContent='×';
-    del.title='移除';
-    del.addEventListener('click',e=>{
-      e.stopPropagation();
-      if(selPhrase===item.text){selPhrase=null;selColor=null;}
-      customChants.splice(idx,1);
-      localStorage.setItem(CUSTOM_KEY,JSON.stringify(customChants));
-      renderCustomChants();
-    });
-    wrap.appendChild(btn);
-    wrap.appendChild(del);
-    customList.appendChild(wrap);
-  });
-}
-renderCustomChants();
-
-function addCustomChant(text,color){
-  if(customChants.some(c=>c.text===text)) return; // 去重
-  customChants.push({text,color});
-  localStorage.setItem(CUSTOM_KEY,JSON.stringify(customChants));
-  renderCustomChants();
-}
-
-document.querySelectorAll('.pb').forEach(btn=>attachPbEvent(btn));
+});
 
 const ci=document.getElementById('ci');
 // 輸入框始終可編輯，不使用 readonly，純靠 focus/blur 管理狀態
@@ -1173,20 +1106,9 @@ ci.addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     const text=ci.value.trim();
     if(text){
-      const fullText=text+' +1';
-      const col=CUSTOM_COLORS[Math.floor(Math.random()*CUSTOM_COLORS.length)];
-      spawnFloat(fullText,col,mx,my);
+      spawnFloat(text+' +1','#e8d4ff',mx,my);
       merit++;
       document.getElementById('mc').textContent=merit;
-      // 加入左側可選清單並記憶（localStorage）
-      addCustomChant(fullText,col);
-      // 自動選中剛加入的文字，方便連續使用
-      document.querySelectorAll('.pb').forEach(b=>b.classList.remove('on'));
-      selPhrase=fullText; selColor=col;
-      setTimeout(()=>{
-        const newBtn=customList.querySelector('.pb[data-t="'+fullText.replace(/"/g,'&quot;')+'"]');
-        if(newBtn) newBtn.classList.add('on');
-      },0);
       ci.value='';
     }
     e.preventDefault();
@@ -1211,82 +1133,6 @@ function tryStartBGM(){
 }
 document.addEventListener('click', tryStartBGM, {once:true});
 document.addEventListener('keydown', tryStartBGM, {once:true});
-
-// Firebase 在主腳本結束後非同步初始化，完全不影響主程式
-window.fbSaveChant=null; // 預設 null，Firebase 載入後才賦值
-<script>
-// ══════════════════════════════════════════════
-//  Firebase 共享文字記憶（完全隔離，失敗不影響主程式）
-// ══════════════════════════════════════════════
-try {
-  const MAX_CHANTS=20, SHOW_ON_LOAD=5;
-  const FB_CFG={
-    apiKey:"AIzaSyArf8vfY5Y8y6EIWMd59SEXOcUramkJFxg",
-    authDomain:"cyber-muyu.firebaseapp.com",
-    databaseURL:"https://cyber-muyu-default-rtdb.firebaseio.com",
-    projectId:"cyber-muyu",
-    storageBucket:"cyber-muyu.firebasestorage.app",
-    messagingSenderId:"144131494504",
-    appId:"1:144131494504:web:a0c5969229217096ff21dd"
-  };
-
-  function fbLoadScript(src){
-    return new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src=src;
-      s.onload=res;
-      s.onerror=()=>rej(new Error('load fail: '+src));
-      document.head.appendChild(s);
-    });
-  }
-
-  Promise.all([
-    fbLoadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'),
-    fbLoadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js')
-  ]).then(()=>{
-    try{
-      if(!firebase.apps.length) firebase.initializeApp(FB_CFG);
-      const db=firebase.database();
-      const ref=db.ref('chants');
-
-      // 頁面載入：讀取並隨機顯示 0~5 條
-      ref.orderByChild('ts').limitToLast(MAX_CHANTS).once('value').then(snap=>{
-        try{
-          const items=[];
-          snap.forEach(c=>{const v=c.val();if(v&&v.text)items.push({text:v.text,color:v.color||'#e8d4ff'});});
-          if(!items.length) return;
-          items.sort(()=>Math.random()-.5);
-          const count=Math.floor(Math.random()*(Math.min(SHOW_ON_LOAD,items.length)+1));
-          setTimeout(()=>{
-            try{ for(let i=0;i<count;i++) addOrbit(items[i].text,items[i].color); }
-            catch(e){ console.warn('FB orbit:',e); }
-          },2500);
-        }catch(e){console.warn('FB read parse:',e);}
-      }).catch(e=>console.warn('FB read:',e));
-
-      // 寫入函數
-      window.fbSaveChant=function(text,color){
-        try{
-          ref.orderByChild('text').equalTo(text).once('value').then(snap=>{
-            if(snap.exists()) return;
-            ref.orderByChild('ts').once('value').then(allSnap=>{
-              const keys=[];
-              allSnap.forEach(c=>keys.push({key:c.key,ts:c.val().ts}));
-              const toDelete=keys.length-(MAX_CHANTS-1);
-              if(toDelete>0){
-                keys.sort((a,b)=>a.ts-b.ts);
-                const del={};
-                for(let i=0;i<toDelete;i++) del['chants/'+keys[i].key]=null;
-                db.ref('/').update(del);
-              }
-              ref.push({text,color,ts:firebase.database.ServerValue.TIMESTAMP});
-            });
-          }).catch(e=>console.warn('FB write check:',e));
-        }catch(e){console.warn('FB write:',e);}
-      };
-    }catch(e){console.warn('Firebase init:',e);}
-  }).catch(e=>console.warn('Firebase SDK:',e));
-} catch(e){ console.warn('Firebase block:',e); }
 </script>
 </body>
 </html>
